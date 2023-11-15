@@ -1,0 +1,62 @@
+# https://taskfile.dev
+
+version: '3'
+
+tasks:
+  default:
+    desc: "List all tasks in this repository"
+    cmds:
+      - go-task --list-all
+    silent: true
+
+  qa:
+    desc: "run code quality tasks"
+    cmds:
+      - task: analyze
+      - task: test
+
+  analyze:
+    desc: "analyze code"
+    cmds:
+      - go vet ./...
+      - go run honnef.co/go/tools/cmd/staticcheck@latest --checks=all ./...
+
+  test:
+    desc: "run tests"
+    cmds:
+      - go test ./...
+
+  coverage:
+    desc: "create test coverage report"
+    cmds:
+      - task: test
+      - mkdir -p coverage
+      - go test -coverprofile=./coverage/coverage.out ./...
+      - go tool cover -html=./coverage/coverage.out -o ./coverage/coverage.html
+
+  build:
+    desc: "build the application"
+    cmds:
+      - task: qa
+      - mkdir -p build
+      - go build -o ./build/ncg
+
+  build-docker:
+    desc: "Build application and docker image"
+    cmds:
+      - podman build --tag cschritt/ncg .
+
+  run:
+    desc: "Run docker image"
+    cmds:
+      - podman run --detach --rm --publish 3000:3000 localhost/cschritt/ncg:latest
+
+  kill:
+    desc: "Kill all running containers"
+    cmds:
+      - podman kill $(podman ps --quiet --filter "ancestor=localhost/cschritt/ncg")
+
+  clean:
+    desc: "Remove build artifacts and not running containers"
+    cmds:
+      - podman rm $(podman ps --all --quiet --filter "ancestor=localhost/cschritt/ncg")
